@@ -1,54 +1,60 @@
 ---
-name: bounty
-title: AgentBounty — On-Chain Task-Bounty Escrow
+name: payrail
+title: PayRail — On-Chain Agent Micropayment Settlement (x402-style)
 description: >-
-  Escrow-backed task bounties for the Pharos AI Agent economy. Lets any wallet or
-  agent post a task with a reward held in escrow (native PHRS or any ERC20 such as
-  PROS), lets other agents submit work, and lets the poster approve one worker to
-  release payment — or cancel/reclaim for a refund. A composable "hire another agent
-  for X" primitive for Pharos.
+  A credibly-neutral settlement layer for AI-agent payments on Pharos. A payer deposits
+  funds (native PHRS or any ERC20 stablecoin), signs off-chain EIP-712 payment vouchers
+  (no gas, no API key), and anyone — a relayer or x402 facilitator — settles them on-chain
+  to the payee with single-use replay protection. Supports EOA and smart-account (EIP-1271)
+  payers. No owner, no admin keys, no protocol fee. The payments backbone Phase-2 Agents
+  build on.
 network: pharos_atlantic_testnet
 chainId: 688689
-deployedAddress: "0xa71e7baB1cB82F1Ee67ca6A32aEBD47840C922aA"
+deployedAddress: "0xdfDf119964C7858905FbE7175Ff32fdD509dEc50"
 verified: true
 version: 0.1.0
 license: MIT
 ---
 
-# AgentBounty Skill
+# PayRail Skill
 
-AgentBounty turns "pay an agent to do a task" into a single, safe, reusable on-chain
-flow. It is a building block: any Phase-2 Agent that needs to **commission work and pay
-on completion** can call this skill instead of reinventing escrow.
+PayRail is the on-chain core of an [x402](https://www.x402.org)-style payment flow — *sign
+off-chain, settle on-chain* — built for the Pharos AI Agent economy. It turns "pay another
+agent / a paid API per call" into a single, safe, reusable settlement primitive that any
+Phase-2 Agent can depend on instead of reinventing payments.
 
-**Lifecycle:** `postBounty` → `submitWork` (workers) → `approve` (pay winner) — with
-`cancel` (no submissions yet) and `reclaim` (after deadline) as the refund paths.
+**Flow:** `deposit` (payer funds) → sign an **EIP-712 voucher** off-chain → `verify` (server
+pre-check) → `redeem` (anyone relays; payee gets paid). Single-use nonces prevent replay.
 
-- **Live & verified:** [`0xa71e7baB1cB82F1Ee67ca6A32aEBD47840C922aA`](https://atlantic.pharosscan.xyz/address/0xa71e7baB1cB82F1Ee67ca6A32aEBD47840C922aA) on Pharos Atlantic Testnet (688689). Also deploys to Pharos Testnet 688688 unchanged.
-- Contract: `src/bounty/BountyBoard.sol` (mirror in `assets/bounty/BountyBoard.sol`)
-- Deploy script: `script/bounty/DeployBountyBoard.s.sol`
-- Full operation reference: [`references/bounty.md`](references/bounty.md)
+- **Live & verified:** [`0xdfDf119964C7858905FbE7175Ff32fdD509dEc50`](https://atlantic.pharosscan.xyz/address/0xdfDf119964C7858905FbE7175Ff32fdD509dEc50) on Pharos Atlantic Testnet (688689).
+- Contract: `src/payrail/PayRail.sol` (mirror in `assets/payrail/PayRail.sol`)
+- Deploy script: `script/payrail/DeployPayRail.s.sol`
+- Full operation reference: [`references/payrail.md`](references/payrail.md)
 - Network config: `assets/networks.json` · Tokens: `assets/tokens.json`
-- Off-chain template (viem): `assets/templates/bounty.ts`
+- Off-chain template (viem): `assets/templates/payrail.ts`
 
 ## Capability Index
 
 | User Need | Capability | Instructions |
 |-----------|------------|--------------|
-| "Deploy the bounty skill / set up the bounty board" | `forge script` deploy | → [references/bounty.md](references/bounty.md#deploy-bountyboard) |
-| "Post a bounty / offer X PHRS for a task" | `postBounty` (native) | → [references/bounty.md](references/bounty.md#post-a-bounty-native-phrs) |
-| "Post a bounty paid in PROS / an ERC20 token" | `approve` + `postBounty` (ERC20) | → [references/bounty.md](references/bounty.md#post-a-bounty-erc20-eg-pros) |
-| "Submit my work / apply for a bounty" | `submitWork` | → [references/bounty.md](references/bounty.md#submit-work) |
-| "Approve a worker / pay the winner / release the reward" | `approve` | → [references/bounty.md](references/bounty.md#approve-a-winner-release-reward) |
-| "Cancel my bounty / get my money back" | `cancel` or `reclaim` | → [references/bounty.md](references/bounty.md#cancel-no-submissions--reclaim-after-deadline) |
-| "Show a bounty / is it still open / how much time left" | `getBounty` / `isOpen` / `timeLeft` / `statusOf` | → [references/bounty.md](references/bounty.md#read-bounty-state-view) |
-| "Verify the contract on the explorer" | `forge verify-contract` | → [references/bounty.md](references/bounty.md#verify-the-contract-on-pharosscan-optional) |
+| "Deploy the payment rail / set up agent payments" | `forge script` deploy | → [references/payrail.md](references/payrail.md#deploy-payrail) |
+| "Fund my agent / deposit PHRS or stablecoin to pay with" | `depositNative` / `deposit` | → [references/payrail.md](references/payrail.md#deposit-funds) |
+| "Authorize a payment / sign a voucher to pay an agent or API" | `hashAuthorization` + sign | → [references/payrail.md](references/payrail.md#build--sign-a-voucher-off-chain-no-gas) |
+| "Check a payment is good before delivering the resource" | `verify` | → [references/payrail.md](references/payrail.md#verify-read-only-x402-check) |
+| "Settle / claim a payment / redeem a voucher" | `redeem` | → [references/payrail.md](references/payrail.md#redeem-settle-a-voucher) |
+| "Settle many micropayments at once" | `redeemMany` | → [references/payrail.md](references/payrail.md#batch-settlement) |
+| "Withdraw my unspent funds" | `withdraw` | → [references/payrail.md](references/payrail.md#withdraw-unspent-balance) |
+| "Check balance / has a voucher been used" | `balanceOf` / `nonceUsed` | → [references/payrail.md](references/payrail.md#reads) |
+| "Audit / verify the contract on the explorer" | `forge verify-contract` | → [references/payrail.md](references/payrail.md#verify-the-contract-on-pharosscan-optional) |
 
 ## Quick facts for the agent
 
-- Native reward → `token = 0x0000000000000000000000000000000000000000`, send `--value == amount`.
-- ERC20 reward → `approve` the board first, send NO `--value`.
-- Amounts are in wei: `cast to-wei <n> ether`.
-- Status codes from views: `0 None`, `1 Open`, `2 Paid`, `3 Refunded`.
-- Always read state (`getBounty` / `statusOf`) before and after a write to confirm it landed.
-- Safety: reentrancy-guarded, checks-effects-interactions, tolerant of non-standard ERC20s.
+- Voucher tuple: `(payer, payee, token, amount, nonce, validAfter, validBefore)`.
+- `token = 0x0000000000000000000000000000000000000000` → native PHRS.
+- `nonce` is single-use per payer — use a fresh one per payment (`cast keccak "<id>"`).
+- `validBefore = 0` → never expires; `validAfter = 0` → valid immediately.
+- Settlement is gasless for the payer: any relayer/facilitator can submit `redeem`.
+- EOA payers sign with ECDSA; smart-account payers are checked via EIP-1271 automatically.
+- Always `verify` before delivering a paid resource; confirm `nonceUsed` after `redeem`.
+- Safety: no admin keys, reentrancy-guarded, checks-effects-interactions, malleability-
+  resistant ECDSA, non-standard-ERC20 tolerant.
