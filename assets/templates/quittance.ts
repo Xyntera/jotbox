@@ -1,7 +1,7 @@
 /**
- * PayRail interaction template (viem).
+ * Quittance interaction template (viem).
  *
- * Shows the full x402-style flow an off-chain agent runs against PayRail on Pharos:
+ * Shows the full x402-style flow an off-chain agent runs against Quittance on Pharos:
  *   deposit -> sign an EIP-712 voucher (no gas) -> verify -> redeem.
  * Install: `npm i viem`.
  *
@@ -28,8 +28,8 @@ export const pharosAtlantic = defineChain({
   blockExplorers: { default: { name: "PharosScan", url: "https://atlantic.pharosscan.xyz" } },
 });
 
-// EIP-712 typed-data definition for a PayRail voucher.
-export const payrailTypes = {
+// EIP-712 typed-data definition for a Quittance voucher.
+export const quittanceTypes = {
   PaymentAuthorization: [
     { name: "payer", type: "address" },
     { name: "payee", type: "address" },
@@ -41,7 +41,7 @@ export const payrailTypes = {
   ],
 } as const;
 
-export const payrailAbi = [
+export const quittanceAbi = [
   { type: "function", name: "depositNative", stateMutability: "payable", inputs: [], outputs: [] },
   {
     type: "function",
@@ -51,7 +51,7 @@ export const payrailAbi = [
       {
         name: "auth",
         type: "tuple",
-        components: payrailTypes.PaymentAuthorization,
+        components: quittanceTypes.PaymentAuthorization,
       },
       { name: "signature", type: "bytes" },
     ],
@@ -65,7 +65,7 @@ export const payrailAbi = [
     name: "redeem",
     stateMutability: "nonpayable",
     inputs: [
-      { name: "auth", type: "tuple", components: payrailTypes.PaymentAuthorization },
+      { name: "auth", type: "tuple", components: quittanceTypes.PaymentAuthorization },
       { name: "signature", type: "bytes" },
     ],
     outputs: [],
@@ -73,7 +73,7 @@ export const payrailAbi = [
 ] as const;
 
 async function main() {
-  const payrail = process.env.PAYRAIL as Address;
+  const quittance = process.env.PAYRAIL as Address;
   const payee = process.env.PAYEE as Address;
   const payer = privateKeyToAccount(process.env.PAYER_PK as `0x${string}`);
   const relayer = privateKeyToAccount(process.env.RELAYER_PK as `0x${string}`);
@@ -84,8 +84,8 @@ async function main() {
 
   // 1) payer deposits 1 PHRS
   await payerWallet.writeContract({
-    address: payrail,
-    abi: payrailAbi,
+    address: quittance,
+    abi: quittanceAbi,
     functionName: "depositNative",
     value: parseEther("1"),
   });
@@ -102,16 +102,16 @@ async function main() {
   } as const;
 
   const signature = await payerWallet.signTypedData({
-    domain: { name: "PayRail", version: "1", chainId: pharosAtlantic.id, verifyingContract: payrail },
-    types: payrailTypes,
+    domain: { name: "Quittance", version: "1", chainId: pharosAtlantic.id, verifyingContract: quittance },
+    types: quittanceTypes,
     primaryType: "PaymentAuthorization",
     message: auth,
   });
 
   // 3) a server verifies before delivering the paid resource
   const [ok, reason] = await pub.readContract({
-    address: payrail,
-    abi: payrailAbi,
+    address: quittance,
+    abi: quittanceAbi,
     functionName: "verify",
     args: [auth, signature],
   });
@@ -120,8 +120,8 @@ async function main() {
   // 4) any relayer settles it on-chain; the payer pays no gas
   if (ok) {
     const hash = await relayerWallet.writeContract({
-      address: payrail,
-      abi: payrailAbi,
+      address: quittance,
+      abi: quittanceAbi,
       functionName: "redeem",
       args: [auth, signature],
     });

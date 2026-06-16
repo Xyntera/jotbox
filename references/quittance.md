@@ -1,18 +1,18 @@
-# Skill Reference: `payrail` — Agent Micropayment Settlement (x402-style)
+# Skill Reference: `quittance` — Agent Micropayment Settlement (x402-style)
 
 On-chain settlement for agent payments on Pharos. A **payer** deposits funds (native PHRS
-or any ERC20 stablecoin) into PayRail, signs **off-chain EIP-712 vouchers** authorizing a
+or any ERC20 stablecoin) into Quittance, signs **off-chain EIP-712 vouchers** authorizing a
 **payee** to receive a fixed amount for a resource, and anyone (a relayer / x402 facilitator)
 calls `redeem` to settle it on-chain. `verify` is the matching read-only pre-check.
 
-**Contract:** `PayRail` · **Skill id:** `payrail` · No owner, no admin keys, no protocol fee.
+**Contract:** `Quittance` · **Skill id:** `quittance` · No owner, no admin keys, no protocol fee.
 
 ## Environment
 
 ```bash
 # Live deployment (Pharos Atlantic Testnet, chain id 688689):
 export RPC=https://atlantic.dplabs-internal.com
-export RAIL=0xdfDf119964C7858905FbE7175Ff32fdD509dEc50   # verified PayRail
+export QUIT=0xd872C6F530c2E1055a522B1978CA99FE65B99F56   # verified Quittance
 export PRIVATE_KEY=0xYOUR_TESTNET_KEY                     # must hold PHRS for gas
 export ME=$(cast wallet address --private-key $PRIVATE_KEY)
 export ZERO=0x0000000000000000000000000000000000000000   # native PHRS sentinel
@@ -28,40 +28,40 @@ export ZERO=0x0000000000000000000000000000000000000000   # native PHRS sentinel
 
 ---
 
-## Deploy PayRail
+## Deploy Quittance
 
 ### Overview
 Deploy once per network; everyone shares the same settlement contract.
 
 ### Command Template
 ```bash
-forge script script/payrail/DeployPayRail.s.sol \
+forge script script/quittance/DeployQuittance.s.sol \
   --rpc-url $RPC --private-key $PRIVATE_KEY --broadcast
 ```
 
 ### Output Parsing
-Logs `PayRail deployed at: 0x...` and the `DOMAIN_SEPARATOR`. Save the address as `$RAIL`.
+Logs `Quittance deployed at: 0x...` and the `DOMAIN_SEPARATOR`. Save the address as `$QUIT`.
 
 > **Agent Guidelines:** 1) Fund `$PRIVATE_KEY` with PHRS. 2) Run the script. 3) Capture
-> `$RAIL`. 4) Verify the source (last section) so payers can audit before depositing.
+> `$QUIT`. 4) Verify the source (last section) so payers can audit before depositing.
 
 ---
 
 ## Deposit funds
 
 ### Overview
-A payer must hold a PayRail balance before vouchers can settle. Deposit native or ERC20.
+A payer must hold a Quittance balance before vouchers can settle. Deposit native or ERC20.
 
 ### Command Template
 ```bash
 # native PHRS
-cast send $RAIL "depositNative()" --value $(cast to-wei 1 ether) \
+cast send $QUIT "depositNative()" --value $(cast to-wei 1 ether) \
   --rpc-url $RPC --private-key $PRIVATE_KEY
 
 # ERC20 (approve first)
-cast send $TOKEN "approve(address,uint256)" $RAIL $(cast to-wei 100 ether) \
+cast send $TOKEN "approve(address,uint256)" $QUIT $(cast to-wei 100 ether) \
   --rpc-url $RPC --private-key $PRIVATE_KEY
-cast send $RAIL "deposit(address,uint256)" $TOKEN $(cast to-wei 100 ether) \
+cast send $QUIT "deposit(address,uint256)" $TOKEN $(cast to-wei 100 ether) \
   --rpc-url $RPC --private-key $PRIVATE_KEY
 ```
 
@@ -73,13 +73,13 @@ cast send $RAIL "deposit(address,uint256)" $TOKEN $(cast to-wei 100 ether) \
 
 ### Output Parsing
 Emits `Deposited(payer, token, amount)`. Confirm with
-`cast call $RAIL "balanceOf(address,address)(uint256)" $ME $TOKEN --rpc-url $RPC`.
+`cast call $QUIT "balanceOf(address,address)(uint256)" $ME $TOKEN --rpc-url $RPC`.
 
 ### Error Handling
 | Error Signature | Cause | Suggested action |
 |---------------|-------|------------------|
-| `PayRail: use depositNative for native` | called `deposit` with `token = 0x0` | Use `depositNative`. |
-| `PayRail: ERC20 transferFrom failed` | missing approval / balance | Approve and fund first. |
+| `Quittance: use depositNative for native` | called `deposit` with `token = 0x0` | Use `depositNative`. |
+| `Quittance: ERC20 transferFrom failed` | missing approval / balance | Approve and fund first. |
 
 ---
 
@@ -98,7 +98,7 @@ NONCE=$(cast keccak "invoice-42")          # unique per payment
 TUPLE="($PAYER,$PAYEE,$ZERO,$AMT,$NONCE,0,0)"
 
 # 1) digest from the contract (chain/domain-bound)
-DIGEST=$(cast call $RAIL \
+DIGEST=$(cast call $QUIT \
   "hashAuthorization((address,address,address,uint256,bytes32,uint256,uint256))(bytes32)" \
   "$TUPLE" --rpc-url $RPC)
 
@@ -109,7 +109,7 @@ SIG=$(cast wallet sign --no-hash "$DIGEST" --private-key $PRIVATE_KEY)
 ### Parameters (voucher fields)
 | Field       | Type      | Description |
 |-------------|-----------|-------------|
-| payer       | `address` | Who pays; must have a PayRail balance and sign the voucher. |
+| payer       | `address` | Who pays; must have a Quittance balance and sign the voucher. |
 | payee       | `address` | Who receives the funds. |
 | token       | `address` | `ZERO` for native PHRS, else ERC20. |
 | amount      | `uint256` | Amount to settle (base units). |
@@ -117,7 +117,7 @@ SIG=$(cast wallet sign --no-hash "$DIGEST" --private-key $PRIVATE_KEY)
 | validAfter  | `uint256` | Earliest redeem time (`0` = now). |
 | validBefore | `uint256` | Expiry (`0` = never). |
 
-> **Agent Guidelines:** Smart-account (EIP-1271) payers sign with their owner key; PayRail
+> **Agent Guidelines:** Smart-account (EIP-1271) payers sign with their owner key; Quittance
 > calls `isValidSignature` on the payer contract automatically — same `redeem` call.
 
 ---
@@ -126,7 +126,7 @@ SIG=$(cast wallet sign --no-hash "$DIGEST" --private-key $PRIVATE_KEY)
 
 ### Command Template
 ```bash
-cast call $RAIL \
+cast call $QUIT \
   "verify((address,address,address,uint256,bytes32,uint256,uint256),bytes)(bool,string)" \
   "$TUPLE" "$SIG" --rpc-url $RPC
 ```
@@ -150,30 +150,30 @@ to `payee`. The payer pays no gas for settlement.
 
 ### Command Template
 ```bash
-cast send $RAIL \
+cast send $QUIT \
   "redeem((address,address,address,uint256,bytes32,uint256,uint256),bytes)" \
   "$TUPLE" "$SIG" --rpc-url $RPC --private-key $RELAYER_KEY
 ```
 
 ### Output Parsing
 Emits `PaymentSettled(payer, payee, token, amount, nonce)`. Confirm with
-`cast call $RAIL "nonceUsed(address,bytes32)(bool)" $PAYER $NONCE --rpc-url $RPC`.
+`cast call $QUIT "nonceUsed(address,bytes32)(bool)" $PAYER $NONCE --rpc-url $RPC`.
 
 ### Error Handling
 | Error Signature | Cause | Suggested action |
 |---------------|-------|------------------|
-| `PayRail: nonce already used` | voucher already redeemed | Issue a new voucher with a fresh nonce. |
-| `PayRail: authorization expired` | past `validBefore` | Re-issue with a later expiry. |
-| `PayRail: authorization not yet valid` | before `validAfter` | Wait until `validAfter`. |
-| `PayRail: invalid signature` | wrong signer or tampered fields | Re-sign the exact tuple with the payer key. |
-| `PayRail: insufficient payer balance` | payer underfunded | Payer must `deposit` more. |
+| `Quittance: nonce already used` | voucher already redeemed | Issue a new voucher with a fresh nonce. |
+| `Quittance: authorization expired` | past `validBefore` | Re-issue with a later expiry. |
+| `Quittance: authorization not yet valid` | before `validAfter` | Wait until `validAfter`. |
+| `Quittance: invalid signature` | wrong signer or tampered fields | Re-sign the exact tuple with the payer key. |
+| `Quittance: insufficient payer balance` | payer underfunded | Payer must `deposit` more. |
 
 > **Agent Guidelines:** 1) `verify` first. 2) `redeem`. 3) Check `nonceUsed == true` and the
 > payee balance increased.
 
 ### Batch settlement
 ```bash
-cast send $RAIL \
+cast send $QUIT \
   "redeemMany((address,address,address,uint256,bytes32,uint256,uint256)[],bytes[])" \
   "[$TUPLE1,$TUPLE2]" "[$SIG1,$SIG2]" --rpc-url $RPC --private-key $RELAYER_KEY
 ```
@@ -184,23 +184,23 @@ Settles many vouchers in one tx — ideal for high-throughput agent micropayment
 ## Withdraw unspent balance
 
 ```bash
-cast send $RAIL "withdraw(address,uint256)" $ZERO $(cast to-wei 0.5 ether) \
+cast send $QUIT "withdraw(address,uint256)" $ZERO $(cast to-wei 0.5 ether) \
   --rpc-url $RPC --private-key $PRIVATE_KEY
 ```
-Refunds your own unspent PayRail balance. Emits `Withdrawn(payer, token, amount)`.
+Refunds your own unspent Quittance balance. Emits `Withdrawn(payer, token, amount)`.
 
 | Error Signature | Cause | Suggested action |
 |---------------|-------|------------------|
-| `PayRail: insufficient balance` | withdrawing more than deposited-minus-spent | Lower the amount. |
+| `Quittance: insufficient balance` | withdrawing more than deposited-minus-spent | Lower the amount. |
 
 ---
 
 ## Reads
 
 ```bash
-cast call $RAIL "balanceOf(address,address)(uint256)" $PAYER $TOKEN --rpc-url $RPC
-cast call $RAIL "nonceUsed(address,bytes32)(bool)"     $PAYER $NONCE --rpc-url $RPC
-cast call $RAIL "DOMAIN_SEPARATOR()(bytes32)"          --rpc-url $RPC
+cast call $QUIT "balanceOf(address,address)(uint256)" $PAYER $TOKEN --rpc-url $RPC
+cast call $QUIT "nonceUsed(address,bytes32)(bool)"     $PAYER $NONCE --rpc-url $RPC
+cast call $QUIT "DOMAIN_SEPARATOR()(bytes32)"          --rpc-url $RPC
 ```
 
 ---
@@ -208,11 +208,11 @@ cast call $RAIL "DOMAIN_SEPARATOR()(bytes32)"          --rpc-url $RPC
 ## Verify the contract on PharosScan (optional)
 
 ```bash
-forge verify-contract $RAIL src/payrail/PayRail.sol:PayRail \
+forge verify-contract $QUIT src/quittance/Quittance.sol:Quittance \
   --verifier blockscout \
   --verifier-url https://api.socialscan.io/pharos-atlantic-testnet/v1/explorer/command_api/contract \
   --chain-id 688689
 ```
 
-> Source verification lets any payer audit PayRail before depositing — critical for a
+> Source verification lets any payer audit Quittance before depositing — critical for a
 > contract that custodies funds. The live deployment above is already verified.

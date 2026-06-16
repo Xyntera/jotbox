@@ -2,22 +2,22 @@
 pragma solidity 0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
-import {PayRail} from "../../src/payrail/PayRail.sol";
+import {Quittance} from "../../src/quittance/Quittance.sol";
 
 /**
- * @notice Deploys PayRail to the configured network.
+ * @notice Deploys Quittance to the configured network.
  *
  * Usage:
- *   forge script script/payrail/DeployPayRail.s.sol \
+ *   forge script script/quittance/DeployQuittance.s.sol \
  *     --rpc-url $RPC --private-key $PRIVATE_KEY --broadcast
  */
-contract DeployPayRail is Script {
-    function run() external returns (PayRail rail) {
+contract DeployQuittance is Script {
+    function run() external returns (Quittance rail) {
         uint256 pk = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(pk);
-        rail = new PayRail();
+        rail = new Quittance();
         vm.stopBroadcast();
-        console.log("PayRail deployed at:", address(rail));
+        console.log("Quittance deployed at:", address(rail));
         console.log("DOMAIN_SEPARATOR:");
         console.logBytes32(rail.DOMAIN_SEPARATOR());
     }

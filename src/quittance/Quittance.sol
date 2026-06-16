@@ -13,16 +13,16 @@ interface IERC1271 {
 }
 
 /**
- * @title PayRail
+ * @title Quittance
  * @notice An on-chain settlement layer for agent micropayments — the credibly-neutral core
  *         of an x402-style "sign off-chain, settle on-chain" payment flow for the Pharos AI
  *         Agent economy.
  *
- *         A payer deposits funds (native PHRS or any ERC20 stablecoin) into PayRail, then
+ *         A payer deposits funds (native PHRS or any ERC20 stablecoin) into Quittance, then
  *         signs off-chain EIP-712 *payment vouchers* — no gas, no API key — authorizing a
  *         payee to receive a fixed amount for a specific resource (encoded in the voucher
  *         nonce). Anyone (a relayer / x402 facilitator) submits the voucher via `redeem`;
- *         PayRail verifies the signature, validity window, single-use nonce and balance,
+ *         Quittance verifies the signature, validity window, single-use nonce and balance,
  *         then settles to the payee. `verify` is the matching read-only check a server runs
  *         before delivering the paid resource (x402's "verify" step).
  *
@@ -34,14 +34,14 @@ interface IERC1271 {
  *           - Agent-friendly: `verify` returns a human-readable reason; rich events; helpers
  *             (`DOMAIN_SEPARATOR`, `hashAuthorization`) so agents can build/verify vouchers.
  */
-contract PayRail {
+contract Quittance {
     // ---------------------------------------------------------------------
     // Types
     // ---------------------------------------------------------------------
 
     /// @dev A single-use, signed authorization to pay `payee` `amount` of `token` from `payer`.
     struct PaymentAuthorization {
-        address payer; // who funds the payment (must have a PayRail balance)
+        address payer; // who funds the payment (must have a Quittance balance)
         address payee; // who receives the funds
         address token; // address(0) == native PHRS, else ERC20 token
         uint256 amount; // amount to settle (must be > 0)
@@ -94,7 +94,7 @@ contract PayRail {
     // ---------------------------------------------------------------------
 
     modifier nonReentrant() {
-        require(_lock == 1, "PayRail: reentrant call");
+        require(_lock == 1, "Quittance: reentrant call");
         _lock = 2;
         _;
         _lock = 1;
@@ -109,26 +109,26 @@ contract PayRail {
     // Deposit / withdraw
     // ---------------------------------------------------------------------
 
-    /// @notice Deposit an ERC20 into your PayRail balance (approve PayRail for `amount` first).
+    /// @notice Deposit an ERC20 into your Quittance balance (approve Quittance for `amount` first).
     function deposit(address token, uint256 amount) external nonReentrant {
-        require(token != address(0), "PayRail: use depositNative for native");
-        require(amount > 0, "PayRail: amount must be greater than zero");
+        require(token != address(0), "Quittance: use depositNative for native");
+        require(amount > 0, "Quittance: amount must be greater than zero");
         _pullERC20(token, msg.sender, amount);
         balanceOf[msg.sender][token] += amount;
         emit Deposited(msg.sender, token, amount);
     }
 
-    /// @notice Deposit native PHRS into your PayRail balance.
+    /// @notice Deposit native PHRS into your Quittance balance.
     function depositNative() external payable nonReentrant {
-        require(msg.value > 0, "PayRail: amount must be greater than zero");
+        require(msg.value > 0, "Quittance: amount must be greater than zero");
         balanceOf[msg.sender][address(0)] += msg.value;
         emit Deposited(msg.sender, address(0), msg.value);
     }
 
     /// @notice Withdraw your own unspent balance.
     function withdraw(address token, uint256 amount) external nonReentrant {
-        require(amount > 0, "PayRail: amount must be greater than zero");
-        require(balanceOf[msg.sender][token] >= amount, "PayRail: insufficient balance");
+        require(amount > 0, "Quittance: amount must be greater than zero");
+        require(balanceOf[msg.sender][token] >= amount, "Quittance: insufficient balance");
         balanceOf[msg.sender][token] -= amount;
         _payout(token, msg.sender, amount);
         emit Withdrawn(msg.sender, token, amount);
@@ -149,7 +149,7 @@ contract PayRail {
         external
         nonReentrant
     {
-        require(auths.length == signatures.length, "PayRail: length mismatch");
+        require(auths.length == signatures.length, "Quittance: length mismatch");
         for (uint256 i; i < auths.length; ++i) {
             _settle(auths[i], signatures[i]);
         }
@@ -203,12 +203,12 @@ contract PayRail {
     // ---------------------------------------------------------------------
 
     function _settle(PaymentAuthorization calldata auth, bytes calldata signature) private {
-        require(auth.amount > 0, "PayRail: amount must be greater than zero");
-        require(block.timestamp >= auth.validAfter, "PayRail: authorization not yet valid");
-        require(auth.validBefore == 0 || block.timestamp <= auth.validBefore, "PayRail: authorization expired");
-        require(!nonceUsed[auth.payer][auth.nonce], "PayRail: nonce already used");
-        require(_isValidSignature(auth.payer, hashAuthorization(auth), signature), "PayRail: invalid signature");
-        require(balanceOf[auth.payer][auth.token] >= auth.amount, "PayRail: insufficient payer balance");
+        require(auth.amount > 0, "Quittance: amount must be greater than zero");
+        require(block.timestamp >= auth.validAfter, "Quittance: authorization not yet valid");
+        require(auth.validBefore == 0 || block.timestamp <= auth.validBefore, "Quittance: authorization expired");
+        require(!nonceUsed[auth.payer][auth.nonce], "Quittance: nonce already used");
+        require(_isValidSignature(auth.payer, hashAuthorization(auth), signature), "Quittance: invalid signature");
+        require(balanceOf[auth.payer][auth.token] >= auth.amount, "Quittance: insufficient payer balance");
 
         // effects before interaction
         nonceUsed[auth.payer][auth.nonce] = true;
@@ -257,7 +257,7 @@ contract PayRail {
         return keccak256(
             abi.encode(
                 _EIP712_DOMAIN_TYPEHASH,
-                keccak256(bytes("PayRail")),
+                keccak256(bytes("Quittance")),
                 keccak256(bytes("1")),
                 block.chainid,
                 address(this)
@@ -268,7 +268,7 @@ contract PayRail {
     function _payout(address token, address to, uint256 amount) private {
         if (token == address(0)) {
             (bool ok,) = payable(to).call{value: amount}("");
-            require(ok, "PayRail: native transfer failed");
+            require(ok, "Quittance: native transfer failed");
         } else {
             _pushERC20(token, to, amount);
         }
@@ -278,12 +278,12 @@ contract PayRail {
     function _pullERC20(address token, address from, uint256 amount) private {
         (bool ok, bytes memory data) =
             token.call(abi.encodeWithSelector(IERC20.transferFrom.selector, from, address(this), amount));
-        require(ok && (data.length == 0 || abi.decode(data, (bool))), "PayRail: ERC20 transferFrom failed");
+        require(ok && (data.length == 0 || abi.decode(data, (bool))), "Quittance: ERC20 transferFrom failed");
     }
 
     /// @dev transfer tolerant of non-standard ERC20s that return no value.
     function _pushERC20(address token, address to, uint256 amount) private {
         (bool ok, bytes memory data) = token.call(abi.encodeWithSelector(IERC20.transfer.selector, to, amount));
-        require(ok && (data.length == 0 || abi.decode(data, (bool))), "PayRail: ERC20 transfer failed");
+        require(ok && (data.length == 0 || abi.decode(data, (bool))), "Quittance: ERC20 transfer failed");
     }
 }

@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {PayRail} from "../src/payrail/PayRail.sol";
+import {Quittance} from "../src/quittance/Quittance.sol";
 
 contract MockERC20 {
     mapping(address => uint256) public balanceOf;
@@ -40,7 +40,7 @@ contract MockSmartWallet {
         owner = _owner;
     }
 
-    function fund(PayRail rail) external payable {
+    function fund(Quittance rail) external payable {
         rail.depositNative{value: msg.value}();
     }
 
@@ -60,8 +60,8 @@ contract MockSmartWallet {
     receive() external payable {}
 }
 
-contract PayRailTest is Test {
-    PayRail rail;
+contract QuittanceTest is Test {
+    Quittance rail;
     MockERC20 token;
 
     uint256 payerPk;
@@ -70,7 +70,7 @@ contract PayRailTest is Test {
     address relayer = makeAddr("relayer");
 
     function setUp() public {
-        rail = new PayRail();
+        rail = new Quittance();
         token = new MockERC20();
         (payer, payerPk) = makeAddrAndKey("payer");
         vm.deal(payer, 100 ether);
@@ -82,9 +82,9 @@ contract PayRailTest is Test {
     function _auth(address token_, uint256 amount, bytes32 nonce, uint256 validBefore)
         internal
         view
-        returns (PayRail.PaymentAuthorization memory)
+        returns (Quittance.PaymentAuthorization memory)
     {
-        return PayRail.PaymentAuthorization({
+        return Quittance.PaymentAuthorization({
             payer: payer,
             payee: payee,
             token: token_,
@@ -95,7 +95,7 @@ contract PayRailTest is Test {
         });
     }
 
-    function _sign(uint256 pk, PayRail.PaymentAuthorization memory auth) internal view returns (bytes memory) {
+    function _sign(uint256 pk, Quittance.PaymentAuthorization memory auth) internal view returns (bytes memory) {
         bytes32 digest = rail.hashAuthorization(auth);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
         return abi.encodePacked(r, s, v);
@@ -136,7 +136,7 @@ contract PayRailTest is Test {
         vm.prank(payer);
         rail.depositNative{value: 5 ether}();
 
-        PayRail.PaymentAuthorization memory auth = _auth(address(0), 1 ether, keccak256("res-1"), 0);
+        Quittance.PaymentAuthorization memory auth = _auth(address(0), 1 ether, keccak256("res-1"), 0);
         bytes memory sig = _sign(payerPk, auth);
 
         (bool ok, string memory reason) = rail.verify(auth, sig);
@@ -159,7 +159,7 @@ contract PayRailTest is Test {
         rail.deposit(address(token), 10 ether);
         vm.stopPrank();
 
-        PayRail.PaymentAuthorization memory auth = _auth(address(token), 3 ether, keccak256("res-erc20"), 0);
+        Quittance.PaymentAuthorization memory auth = _auth(address(token), 3 ether, keccak256("res-erc20"), 0);
         bytes memory sig = _sign(payerPk, auth);
 
         rail.redeem(auth, sig);
@@ -171,7 +171,7 @@ contract PayRailTest is Test {
         vm.prank(payer);
         rail.depositNative{value: 5 ether}();
 
-        PayRail.PaymentAuthorization[] memory auths = new PayRail.PaymentAuthorization[](3);
+        Quittance.PaymentAuthorization[] memory auths = new Quittance.PaymentAuthorization[](3);
         bytes[] memory sigs = new bytes[](3);
         for (uint256 i; i < 3; ++i) {
             auths[i] = _auth(address(0), 1 ether, keccak256(abi.encode("batch", i)), 0);
@@ -192,7 +192,7 @@ contract PayRailTest is Test {
         wallet.fund{value: 5 ether}(rail);
         assertEq(rail.balanceOf(address(wallet), address(0)), 5 ether);
 
-        PayRail.PaymentAuthorization memory auth = PayRail.PaymentAuthorization({
+        Quittance.PaymentAuthorization memory auth = Quittance.PaymentAuthorization({
             payer: address(wallet),
             payee: payee,
             token: address(0),
@@ -216,11 +216,11 @@ contract PayRailTest is Test {
     function test_RevertWhen_ReplayNonce() public {
         vm.prank(payer);
         rail.depositNative{value: 5 ether}();
-        PayRail.PaymentAuthorization memory auth = _auth(address(0), 1 ether, keccak256("dup"), 0);
+        Quittance.PaymentAuthorization memory auth = _auth(address(0), 1 ether, keccak256("dup"), 0);
         bytes memory sig = _sign(payerPk, auth);
 
         rail.redeem(auth, sig);
-        vm.expectRevert("PayRail: nonce already used");
+        vm.expectRevert("Quittance: nonce already used");
         rail.redeem(auth, sig);
     }
 
@@ -228,16 +228,16 @@ contract PayRailTest is Test {
         vm.prank(payer);
         rail.depositNative{value: 5 ether}();
         vm.warp(1000);
-        PayRail.PaymentAuthorization memory auth = _auth(address(0), 1 ether, keccak256("exp"), 500);
+        Quittance.PaymentAuthorization memory auth = _auth(address(0), 1 ether, keccak256("exp"), 500);
         bytes memory sig = _sign(payerPk, auth);
-        vm.expectRevert("PayRail: authorization expired");
+        vm.expectRevert("Quittance: authorization expired");
         rail.redeem(auth, sig);
     }
 
     function test_RevertWhen_NotYetValid() public {
         vm.prank(payer);
         rail.depositNative{value: 5 ether}();
-        PayRail.PaymentAuthorization memory auth = PayRail.PaymentAuthorization({
+        Quittance.PaymentAuthorization memory auth = Quittance.PaymentAuthorization({
             payer: payer,
             payee: payee,
             token: address(0),
@@ -247,16 +247,16 @@ contract PayRailTest is Test {
             validBefore: 0
         });
         bytes memory sig = _sign(payerPk, auth);
-        vm.expectRevert("PayRail: authorization not yet valid");
+        vm.expectRevert("Quittance: authorization not yet valid");
         rail.redeem(auth, sig);
     }
 
     function test_RevertWhen_InsufficientBalance() public {
         vm.prank(payer);
         rail.depositNative{value: 1 ether}();
-        PayRail.PaymentAuthorization memory auth = _auth(address(0), 2 ether, keccak256("over"), 0);
+        Quittance.PaymentAuthorization memory auth = _auth(address(0), 2 ether, keccak256("over"), 0);
         bytes memory sig = _sign(payerPk, auth);
-        vm.expectRevert("PayRail: insufficient payer balance");
+        vm.expectRevert("Quittance: insufficient payer balance");
         rail.redeem(auth, sig);
     }
 
@@ -264,26 +264,26 @@ contract PayRailTest is Test {
         vm.prank(payer);
         rail.depositNative{value: 5 ether}();
         (, uint256 wrongPk) = makeAddrAndKey("attacker");
-        PayRail.PaymentAuthorization memory auth = _auth(address(0), 1 ether, keccak256("bad"), 0);
+        Quittance.PaymentAuthorization memory auth = _auth(address(0), 1 ether, keccak256("bad"), 0);
         bytes memory sig = _sign(wrongPk, auth); // signed by someone other than payer
-        vm.expectRevert("PayRail: invalid signature");
+        vm.expectRevert("Quittance: invalid signature");
         rail.redeem(auth, sig);
     }
 
     function test_RevertWhen_TamperedAmount() public {
         vm.prank(payer);
         rail.depositNative{value: 5 ether}();
-        PayRail.PaymentAuthorization memory auth = _auth(address(0), 1 ether, keccak256("tamper"), 0);
+        Quittance.PaymentAuthorization memory auth = _auth(address(0), 1 ether, keccak256("tamper"), 0);
         bytes memory sig = _sign(payerPk, auth);
         auth.amount = 4 ether; // change after signing -> digest mismatch
-        vm.expectRevert("PayRail: invalid signature");
+        vm.expectRevert("Quittance: invalid signature");
         rail.redeem(auth, sig);
     }
 
     function test_VerifyReflectsState() public {
         vm.prank(payer);
         rail.depositNative{value: 5 ether}();
-        PayRail.PaymentAuthorization memory auth = _auth(address(0), 1 ether, keccak256("v"), 0);
+        Quittance.PaymentAuthorization memory auth = _auth(address(0), 1 ether, keccak256("v"), 0);
         bytes memory sig = _sign(payerPk, auth);
 
         (bool ok,) = rail.verify(auth, sig);
@@ -303,7 +303,7 @@ contract PayRailTest is Test {
         vm.prank(payer);
         rail.depositNative{value: deposit}();
 
-        PayRail.PaymentAuthorization memory auth = _auth(address(0), amount, nonce, 0);
+        Quittance.PaymentAuthorization memory auth = _auth(address(0), amount, nonce, 0);
         bytes memory sig = _sign(payerPk, auth);
 
         uint256 before = payee.balance;
