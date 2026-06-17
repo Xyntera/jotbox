@@ -1,0 +1,19 @@
+<svg width="480" height="480" viewBox="0 0 480 480" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0A0E1A"/>
+      <stop offset="1" stop-color="#131C36"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="480" rx="104" fill="url(#bg)"/>
+  <!-- Q body: ring -->
+  <circle cx="232" cy="232" r="132" fill="none" stroke="url(#ring)" stroke-width="26"/>
+  <!-- Q tail (lower-right), font-free monogram -->
+  <line x1="300" y1="300" x2="378" y2="378" stroke="url(#ring)" stroke-width="26" stroke-linecap="round"/>
+  <!-- settled / receipt check inside the Q -->
+  <path d="M183 238 L223 282 L300 178" fill="none" stroke="#34D399" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
